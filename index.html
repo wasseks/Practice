@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data visualizer</title>
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Initial Page -->
+    <div id="initialPage">
+      <button id="parseJson">Load JSON</button>
+    </div>
+
+    <!-- Devices Page -->
+    <div id="devicesPage" style="display: none;">
+      <button id="devicesBackButton">Back</button>
+      <h2>Select device</h2>
+      <div id="devicesButtons"></div>
+    </div>
+
+    <!-- Charts Page -->
+    <div id="chartsPage" style="display: none;">
+      <div id="chartControls">
+        <button id="chartsBackButton">Back to Devices</button>
+        <div class="dropdown" data-type="aggregation">
+          <button class="dropdown-button">Select Aggregation</button>
+          <ul class="dropdown-menu">
+            <li><a href="#" data-value="raw">Raw Data</a></li>
+            <li><a href="#" data-value="hourly">Hourly Average</a></li>
+            <li><a href="#" data-value="threeHourly">3-Hour Average</a></li>
+            <li><a href="#" data-value="daily">Daily Average</a></li>
+            <li><a href="#" data-value="dailyMinMax">Daily Min/Max</a></li>
+          </ul>
+        </div>
+        <div class="dropdown" data-type="chartType">
+          <button class="dropdown-button">Select Chart Type</button>
+          <ul class="dropdown-menu">
+            <li><a href="#" data-value="line">Line</a></li>
+            <li><a href="#" data-value="bar">Bar</a></li>
+            <li><a href="#" data-value="scatter">Scatter</a></li>
+          </ul>
+        </div>
+        <button class="time-range-button" data-toggle-modal="#timeRangeModal">Select time range</button>
+      </div>
+      <h2 id="chartTitle"></h2>
+      <div id="chartsContainer"></div>
+    </div>
+
+    <!-- Time Range Modal -->
+    <div id="timeRangeModal" class="modal" tabindex="-1">
+      <div class="modal-content">
+        <h3>Select Time Range</h3>
+        <div>
+          <label>Start Time:</label>
+          <input type="datetime-local" id="startTime">
+        </div>
+        <div>
+          <label>End Time:</label>
+          <input type="datetime-local" id="endTime">
+        </div>
+        <div>
+          <button class="modal-button-primary">Apply</button>
+          <button class="modal-button-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="src/index.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "name": "data-visualizer",
+  "private": true,
+  "version": "0.0.0",
+  "main": "main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "electron": "electron .",
+    "build-app": "npm run build && electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "vite": "^7.0.0"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.0"
+  },
+  "build": {
+    "appId": "com.datavisualizer.app",
+    "productName": "DataVisualizer",
+    "files": [
+      "build/**/*",
+      "main.js",
+      "preload.js"
+    ],
+    "directories": {
+      "output": "build-electron"
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "mac": {
+      "target": ["dmg"]
+    },
+    "linux": {
+      "target": ["AppImage"]
+    }
+  }
+}
