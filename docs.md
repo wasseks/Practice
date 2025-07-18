@@ -24,7 +24,7 @@ Responsible for main logic of the application and processing the interface
 
 ## Main class for application "AppManager":
 
-- Adds event liseners to all the buttons
+- Adds event listeners to all the buttons
 - function showInitialPage
 - function showDevicesPage
 - function showChartsPage
