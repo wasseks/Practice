@@ -12,7 +12,7 @@ Second page with devices to pick device from json file to build graph depending 
 
 Third page with all the graphs
 
--modal:
+- modal:
 
 additional page for selecting time range
 
