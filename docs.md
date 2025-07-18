@@ -18,20 +18,20 @@ additional page for selecting time range
 
 # Modules structure
 
-- index.js:
+- src/index.js:
 
 Responsible for main logic of the application and processing the interface
 
-- - One main class for application "AppManager":
+## Main class for application "AppManager":
 
-- - - Adds event liseners to all the buttons
-- - - function showInitialPage
-- - - function showDevicesPage
-- - - function showChartsPage
-- - - function handleParseJson
+- Adds event liseners to all the buttons
+- function showInitialPage
+- function showDevicesPage
+- function showChartsPage
+- function handleParseJson
 -------------------------------------------------
 
-- parser.js:
+- src/parser.js:
 
 Resposible for parsing json
 
@@ -40,21 +40,22 @@ Exports 1 function:
 - - parseJson
 -------------------------------------------------
 
-- charts.js:
+- src/charts.js:
 
 Manages chart data and rendering for device properties.
 
-- - Exports class "ChartManager" with functions:
+## Exports class "ChartManager" with functions:
 
-- - - initializeNewDevice
-- - - aggregateData
-- - - filterByTimeRange
-- - - renderCharts
+- initializeNewDevice
+- aggregateData
+- filterByTimeRange
+- renderCharts
 -------------------------------------------------
 
 - main.js:
 
 Loads electron app, responsible for window application and integration with OS(open/close, etc)
+
 -------------------------------------------------
 
 - preload.js:
