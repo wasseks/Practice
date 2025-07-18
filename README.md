@@ -50,7 +50,7 @@ npm run build-app
 - Vite
 - Electron  
 - Charts.js
-- Chrominum (google chrome engine)
+- Chromium (google chrome engine)
 
 ## Usage
 
