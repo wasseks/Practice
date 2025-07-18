@@ -14,7 +14,7 @@ Third page with all the graphs
 
 - modal:
 
-additional page for selecting time range
+Additional page for selecting time range
 
 # Modules structure
 
@@ -25,10 +25,10 @@ Responsible for main logic of the application and processing the interface
 ### Main class for application "AppManager":
 
 - Adds event listeners to all the buttons
-- function showInitialPage
-- function showDevicesPage
-- function showChartsPage
-- function handleParseJson
+- Function showInitialPage
+- Function showDevicesPage
+- Function showChartsPage
+- Function handleParseJson
 -------------------------------------------------
 
 ## src/parser.js:
