@@ -233,10 +233,8 @@ class AppManager {
         return;
       }
 
-      // Parse the data using our module
+      // Parse the data
       const parsed = parseData(result.data);
-
-      // Store the result in our variables
       this.devices = parsed.devices;
       this.chartManager.devicesData = parsed.data; // Update ChartManager's devicesData
 

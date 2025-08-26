@@ -15,16 +15,14 @@ export function parseData(jsonData) {
   const processedData = [];
 
   for (const entry of Object.values(jsonData)) {
-    // Ensure essential fields exist and 'data' is an object
     if (entry.uName && entry.Date && entry.data) {
-      // Add unique device name
       deviceNames.add(entry.uName);
 
-      // Store the processed entry for later use
       processedData.push({
         uName: entry.uName,
         Date: entry.Date, 
-        data: entry.data
+        data: entry.data,
+        serial: entry.serial
       });
     } else {
       console.warn('Parser: Skipping entry due to missing/invalid essential fields:', entry);
@@ -35,7 +33,7 @@ export function parseData(jsonData) {
   processedData.sort((a, b) => new Date(a.Date) - new Date(b.Date));
 
   console.log('Parser: Finished parsing. Found devices:', Array.from(deviceNames));
-  console.log('Parser: Example of processedData entry (first 5):', processedData.slice(0, 5)); // Log a sample of processed data
+  console.log('Parser: Example of processedData entry (first 5):', processedData.slice(0, 5));
   console.log('Parser: Total processed data entries:', processedData.length);
 
   return {

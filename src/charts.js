@@ -10,30 +10,35 @@ class ChartManager {
    * @param {Array} devicesData - The data for all devices.
    */
   constructor(chartsContainer, devicesData = []) {
-    // Global array to store chart data: [{ propertyKey, labels, data }]
+    // Global array to store chart data: [{ propertyKey, labels, data: [{serial, values}] }]
     this.deviceChartsData = [];
     // Global array to store active Chart.js instances
     this.activeCharts = [];
     this.devicesData = devicesData;
     this.chartsContainer = chartsContainer;
+    this.aggregationType = 'raw';
+    this.chartType = 'line';
   }
 
   /**
-   * initializes new device and renders charts
+   * Initializes new device and renders charts
    */
   initializeNewDevice(selectedDeviceName) {
     this.deviceName = selectedDeviceName;
-    this.aggregateData('raw');
-    this.renderCharts('line');
+    this.chartType = 'line';
+    this.aggregateData();
+    this.renderCharts();
   }
 
   /**
    * Filters and aggregates data for a specific device, updating deviceChartsData.
    * @param {string} type - Aggregation type ('raw', 'hourly', 'threeHourly', 'daily', 'dailyMinMax').
+   * deviceChartsData - array of objects {string: propertyKey, string_array: labels, data: [{serial, values}]}
+   * where data contains arrays of values for each serial.
    */
   aggregateData(type = this.aggregationType) {
     // Clear previous data for the device
-    console.log("aggragate type: ", type);
+    console.log("aggregate type: ", type);
     this.deviceChartsData = [];
     this.aggregationType = type;
 
@@ -46,15 +51,8 @@ class ChartManager {
       return;
     }
 
-    // Get unique property keys, excluding non-numeric system fields
-    const propertyKeys = new Set();
-    deviceData.forEach(entry => {
-      if (entry.data && typeof entry.data === 'object') {
-        for (const key in entry.data) {
-          propertyKeys.add(key);
-        }
-      }
-    });
+    // Get unique properties, excluding non-numeric fields
+    const propertyKeys = new Set(deviceData.flatMap(entry => entry.data ? Object.keys(entry.data) : []));
     console.log('Property keys:', Array.from(propertyKeys));
 
     if (propertyKeys.size === 0) {
@@ -64,75 +62,106 @@ class ChartManager {
 
     // Prepare data for each property
     propertyKeys.forEach(propertyKey => {
-      // Filter valid numeric entries
-      const validEntries = deviceData
-        .filter(entry => {
-          const value = entry.data[propertyKey];
-          const date = new Date(entry.Date);
-          return value != null && typeof value !== 'string' && !isNaN(value) && !isNaN(date);
-        })
-        .map(entry => ({
-          Date: entry.Date,
-          value: entry.data[propertyKey]
-        }));
+      // Get unique serials for this property
+      const serials = new Set(deviceData.map(entry => entry.serial));
 
-      if (validEntries.length === 0) {
-        console.warn(`No valid data for property: ${propertyKey}`);
+      if (serials.size === 0) {
+        console.warn(`No valid serials for property: ${propertyKey}`);
+        return;
+      }
+      
+      // Prepare data for each serial
+      const serialData = Array.from(serials).map(serial => {
+        // Filter valid entries for this serial and property
+        const validEntries = deviceData
+          .filter(entry => {
+            const value = entry.data[propertyKey];
+            const date = new Date(entry.Date);
+            return entry.serial === serial &&
+                   value != null &&
+                   typeof value !== 'string' &&
+                   !isNaN(value) &&
+                   !isNaN(date);
+          }) // 
+          .map(entry => ({
+            Date: entry.Date,
+            value: entry.data[propertyKey]
+          }));
+
+        if (validEntries.length === 0) {
+          console.warn(`No valid data for property: ${propertyKey}, serial: ${serial}`);
+          return null;
+        }
+
+        // Aggregate data based on type
+        let aggregated = validEntries;
+        if (type !== 'raw') {
+          const grouped = {};
+          validEntries.forEach(entry => {
+            const date = new Date(entry.Date);
+            let key;
+
+            if (type === 'hourly') {
+              key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:00`;
+            } else if (type === 'threeHourly') {
+              const threeHourBlock = Math.floor(date.getHours() / 3) * 3;
+              key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()} ${threeHourBlock}:00`;
+            } else if (type === 'daily' || type === 'dailyMinMax') {
+              key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+            }
+
+            if (!grouped[key]) {
+              grouped[key] = { values: [], date: key };
+            }
+            grouped[key].values.push(entry.value);
+          });
+
+          aggregated = Object.values(grouped).map(group => {
+            let value;
+            if (type === 'dailyMinMax') {
+              value = {
+                min: Math.min(...group.values.filter(v => !isNaN(v))),
+                max: Math.max(...group.values.filter(v => !isNaN(v)))
+              };
+            } else {
+              const validValues = group.values.filter(v => !isNaN(v));
+              value = validValues.length > 0 ? validValues.reduce((sum, val) => sum + val, 0) / validValues.length : NaN;
+            }
+            return { Date: group.date, value };
+          });
+
+          aggregated = aggregated.filter(entry => 
+            !isNaN(entry.value) || 
+            (type === 'dailyMinMax' && !isNaN(entry.value.min) && !isNaN(entry.value.max))
+          );
+        }
+
+        return { serial, entries: aggregated };
+      }).filter(item => item !== null);
+
+      if (serialData.length === 0) {
+        console.warn(`No valid aggregated data for property: ${propertyKey}`);
         return;
       }
 
-      // Aggregate data based on type
-      let aggregated = validEntries;
-      if (type !== 'raw') {
-        const grouped = {};
-        validEntries.forEach(entry => {
-          const date = new Date(entry.Date);
-          let key;
+      // Prepare labels (use the union of all dates across serials)
+      const allDates = new Set();
+      serialData.forEach(({ entries }) => {
+        entries.forEach(entry => allDates.add(entry.Date));
+      });
+      const labels = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
 
-          if (type === 'hourly') {
-            key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:00`;
-          } else if (type === 'threeHourly') {
-            const threeHourBlock = Math.floor(date.getHours() / 3) * 3;
-            key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()} ${threeHourBlock}:00`;
-          } else if (type === 'daily' || type === 'dailyMinMax') {
-            key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-          }
-
-          if (!grouped[key]) {
-            grouped[key] = { values: [], date: key };
-          }
-          grouped[key].values.push(entry.value);
-        });
-
-        aggregated = Object.values(grouped).map(group => {
-          let value;
+      // Prepare data for each serial, aligning with labels
+      const data = serialData.map(({ serial, entries }) => {
+        const values = labels.map(label => {
+          const entry = entries.find(e => e.Date === label);
           if (type === 'dailyMinMax') {
-            value = {
-              min: Math.min(...group.values.filter(v => !isNaN(v))),
-              max: Math.max(...group.values.filter(v => !isNaN(v)))
-            };
-          } else {
-            const validValues = group.values.filter(v => !isNaN(v));
-            value = validValues.length > 0 ? validValues.reduce((sum, val) => sum + val, 0) / validValues.length : NaN;
+            return entry ? [entry.value.min, entry.value.max] : [null, null];
           }
-          return { Date: group.date, value };
+          return entry ? entry.value : null;
         });
-
-        aggregated = aggregated.filter(entry => !isNaN(entry.value) || (type === 'dailyMinMax' && !isNaN(entry.value.min) && !isNaN(entry.value.max)));
-      }
-
-      // Prepare labels and data for Chart.js
-      let labels, data;
-      if (type === 'dailyMinMax') {
-        labels = aggregated.map(entry => entry.Date);
-        data = [
-          aggregated.map(entry => entry.value.min),
-          aggregated.map(entry => entry.value.max)
-        ];
-      } else {
-        labels = aggregated.map(entry => entry.Date);
-        data = aggregated.map(entry => entry.value);
-      }
+        return { serial, values };
+      });
 
       this.deviceChartsData.push({ propertyKey, labels, data });
     });
@@ -172,15 +201,18 @@ class ChartManager {
       }
 
       const filteredLabels = filteredIndices.map(index => item.labels[index]);
-      let filteredData;
-      if (Array.isArray(item.data[0])) { // dailyMinMax
-        filteredData = [
-          filteredIndices.map(index => item.data[0][index]),
-          filteredIndices.map(index => item.data[1][index])
-        ];
-      } else {
-        filteredData = filteredIndices.map(index => item.data[index]);
-      }
+      const filteredData = item.data.map(({ serial, values }) => {
+        let filteredValues;
+        if (this.aggregationType === 'dailyMinMax') {
+          filteredValues = [
+            filteredIndices.map(index => values[index] ? values[index][0] : null),
+            filteredIndices.map(index => values[index] ? values[index][1] : null)
+          ];
+        } else {
+          filteredValues = filteredIndices.map(index => values[index]);
+        }
+        return { serial, values: filteredValues };
+      });
 
       return { propertyKey: item.propertyKey, labels: filteredLabels, data: filteredData };
     }).filter(item => item !== null);
@@ -191,10 +223,13 @@ class ChartManager {
    * @param {string} chartType - Chart type ('line', 'bar', 'scatter').
    */
   renderCharts(chartType = this.chartType) {
+    // Clear previous charts to render new ones
     this.activeCharts.forEach(chart => chart.destroy());
     this.activeCharts = [];
     this.chartsContainer.innerHTML = '';
+
     this.chartType = chartType;
+
     if (this.deviceChartsData.length === 0) {
       this.chartsContainer.innerHTML = '<p>No property data to display.</p>';
       console.warn('No chart data provided for rendering');
@@ -202,9 +237,21 @@ class ChartManager {
     }
     console.log("chart Type: ", chartType);
 
+     // Define color palette for different serials
+    const colors = [
+      'rgba(100, 108, 255, 1)', // Blue
+      'rgba(255, 99, 132, 1)',  // Red
+      'rgba(75, 192, 192, 1)',  // Teal
+      'rgba(255, 159, 64, 1)',  // Orange
+      'rgba(153, 102, 255, 1)', // Purple
+      'rgba(255, 205, 86, 1)',  // Yellow
+      'rgba(0, 128, 0, 1)',     // Green
+      'rgba(128, 0, 128, 1)'    // Magenta
+    ];
+
     // Create a chart for each property
     this.deviceChartsData.forEach(({ propertyKey, labels, data }) => {
-      if (data.length === 0) {
+      if (data.length === 0 || data.every(({ values }) => values.every(v => v === null))) {
         console.warn(`No data to render for property: ${propertyKey}`);
         return;
       }
@@ -216,38 +263,49 @@ class ChartManager {
 
       try {
         let datasets;
-        if (Array.isArray(data[0])) { // dailyMinMax
-          datasets = [
-            {
-              label: `${propertyKey} (Min)`,
-              data: data[0],
-              borderColor: 'rgba(100, 108, 255, 1)',
-              backgroundColor: 'rgba(100, 108, 255, 0.2)',
-              fill: chartType === 'line' ? true : false,
-              tension: chartType === 'line' ? 0.1 : 0,
-              pointRadius: chartType === 'scatter' ? 5 : 0
-            },
-            {
-              label: `${propertyKey} (Max)`,
-              data: data[1],
-              borderColor: 'rgba(255, 99, 132, 1)',
-              backgroundColor: 'rgba(255, 99, 132, 0.2)',
-              fill: chartType === 'line' ? true : false,
-              tension: chartType === 'line' ? 0.1 : 0,
-              pointRadius: chartType === 'scatter' ? 5 : 0
-            }
-          ];
+        if (this.aggregationType === 'dailyMinMax') {
+          // For dailyMinMax, create two datasets per serial (min and max)
+          datasets = data.flatMap(({ serial, values }, index) => {
+            const colorIndex = index % colors.length;
+            return [
+              {
+                label: `${propertyKey} (Min, Serial: ${serial})`,
+                data: values.map(v => v ? v[0] : null),
+                borderColor: colors[colorIndex],
+                backgroundColor: colors[colorIndex].replace('1)', '0.2)'),
+                fill: chartType === 'line' ? true : false,
+                tension: chartType === 'line' ? 0.1 : 0,
+                pointRadius: chartType === 'scatter' ? 5 : 0,
+                spanGaps: false
+              },
+              {
+                label: `${propertyKey} (Max, Serial: ${serial})`,
+                data: values.map(v => v ? v[1] : null),
+                borderColor: colors[colorIndex].replace('1)', '0.8)'),
+                backgroundColor: colors[colorIndex].replace('1)', '0.1)'),
+                fill: chartType === 'line' ? true : false,
+                tension: chartType === 'line' ? 0.1 : 0,
+                pointRadius: chartType === 'scatter' ? 5 : 0,
+                spanGaps: false
+              }
+            ];
+          });
         } else {
-          datasets = [{
-            label: propertyKey,
-            data,
-            borderColor: 'rgba(100, 108, 255, 1)',
-            backgroundColor: 'rgba(100, 108, 255, 0.2)',
-            borderWidth: chartType === 'bar' ? 2 : 1,
-            fill: chartType === 'line' ? true : false,
-            tension: chartType === 'line' ? 0.1 : 0,
-            pointRadius: chartType === 'scatter' ? 3 : 0
-          }];
+          // For other aggregation types, create one dataset per serial and pick color
+          datasets = data.map(({ serial, values }, index) => {
+            const colorIndex = index % colors.length;
+            return {
+              label: `${propertyKey} (Serial ${serial})`,
+              data: values,
+              borderColor: colors[colorIndex],
+              backgroundColor: colors[colorIndex].replace('1)', '0.2)'),
+              borderWidth: chartType === 'bar' ? 2 : 1,
+              fill: chartType === 'line' ? true : false,
+              tension: chartType === 'line' ? 0.1 : 0,
+              pointRadius: chartType === 'scatter' ? 3 : 0,
+              spanGaps: chartType === 'line' ? true : false
+            };
+          });
         }
 
         const chartConfig = {
@@ -265,12 +323,12 @@ class ChartManager {
                 title: {
                   display: true,
                   text: 'Time'
-                }
+                },
               },
               y: {
                 title: {
                   display: true,
-                  text: datasets.length > 1 ? 'Min/Max Value' : 'Value'
+                  text: this.aggregationType === 'dailyMinMax' ? 'Min/Max Value' : 'Value'
                 }
               }
             },
