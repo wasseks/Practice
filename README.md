@@ -58,14 +58,18 @@ npm run build-app
 2. Click the "Load JSON" button to select a JSON file.
 3. Choose a device to view its data visualized with Chart.js.
 
-* initial Page
+### Initial page
+
 ![initialPage](assets/initPage.png)
 
-* devices Page
+### Devices page
+
 ![devicesPage](assets/devPage.png)
 
-* charts Page
+### Charts page
+
 ![chartsPage](assets/chartsPage.png)
 
-* modal Window to select time range
+### Modal window to select time range
+
 ![modalWindow](assets/modal.png)
